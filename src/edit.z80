@@ -1,0 +1,150 @@
+edit:
+;Inputs:
+;   need edit_bottom,edit_top,edit_end,edit_ptr,
+;   key_to_tok
+;   edit_hook
+;   get_tok_size
+  ld a,1<<insertmode
+  ld (flags+keyflags),a
+rerender_edit:
+  call rerender_editor
+edit_loop:
+  in a,(4)
+  and 8
+  ret z
+  call getKeyDebounce
+  or a
+  jr z,edit_loop
+  call process_keypress
+  jr c,edit_loop
+;HL is a pointer to a size-prefixed tok string
+  ex de,hl
+  ld hl,(edit_ptr)
+  call edit_hook      ;input and output: HL cur tok, DE new size-prefixed tokstr
+  call replacetokens
+  ret c               ;there was an error
+  jr nc,rerender_edit
+  ret
+
+replacetokens:
+;HL points to the current tokens
+;DE points to the new tokens
+;BC is the number of tokens to replace
+;returns carry if there was an error
+  push de
+  push hl
+  push de
+  call getsizetokstr
+  pop hl
+  ld e,(hl)
+  inc hl
+  ld d,(hl)
+  inc hl
+  ex de,hl
+;DE is pointer to new string
+;HL is the new size
+;BC is the old size
+  or a
+  sbc hl,bc
+
+  ld b,h
+  ld c,l
+  pop hl
+  call nz,insertmem
+  pop de
+  ret c     ;maybe want to throw an error?
+;HL points to where to write
+;DE points to the size-prefixed string to write
+  ex de,hl
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  inc hl
+  ld a,b
+  or c
+  ret z
+  ldir
+  ;DE is the new edit_ptr ?
+  ld (edit_ptr),de
+  ret
+
+rerender_editor:
+edit_hook:
+  ret
+
+get_tok_size:
+;HL points to the token
+;return HL pointing to the next token and BC as the size
+;First, verify that there are even bytes left!
+  ld de,(edit_end)
+  ld bc,0
+  or a
+  sbc hl,de
+  add hl,de
+  ret nc
+  ;if HL>=DE, should exit with BC=0
+
+
+;here is the custom stuff
+_IsA2ByteTok  = 42A3h
+  ld a,(hl)
+  inc hl
+  inc c
+  bcall(_IsA2ByteTok)
+  ret nz
+  inc hl
+  inc c
+  ret
+
+process_keypress:
+key_to_tok:
+;return carry if no token returned
+;return HL as a pointer to the null-terminated token string
+;       BC as the number of tokens to overwrite,
+  call getKeyTok
+  ret c
+;else, the key was a token
+  ;DE is the token, D is 0 if a 1-byte token
+
+;These will only replace 1 token, so set BC to 1
+  ld bc,1
+
+;write the token to a spot in RAM
+  xor a
+  ld hl,OP1+4
+  ld (hl),a
+  dec hl
+  inc a
+  ld (hl),e
+  dec hl
+  inc d
+  dec d
+  jr z,+_
+  ld (hl),d
+  inc a
+  dec hl
+_:
+
+;Now write the size bytes of the token string (# of bytes, not tokens)
+  ld (hl),b
+  dec hl
+  ld (hl),a
+
+;If the token is a newline, we'll actually insert, even in overwrite mode
+  inc d
+  dec d
+  jr nz,+_
+  ld a,e
+  cp $3F
+  jr z,key_to_tok_replace0
+_:
+
+;If insert mode, we'll actually replace 0 bytes
+  bit insertmode,(iy+keyflags)
+  jr z,+_
+key_to_tok_replace0:
+  ld c,b
+_:
+
+  or a
+  ret

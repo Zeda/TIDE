@@ -1,0 +1,38 @@
+getsizetokstr:
+;Inputs:
+;   HL points to the token string
+;   BC is the number of tokens
+;Outputs:
+;   BC is the size of the string in bytes
+;   HL points to the byte after the token string
+  ld a,b
+  or c
+  ret z
+  ld de,0
+getsizetokstr_loop:
+  push bc
+  push de
+  call get_tok_size     ;return size in BC, HL points to the byte after the token
+  pop de
+  ex de,hl
+  add hl,bc
+  ex de,hl
+  pop bc
+  dec bc
+  ld a,b
+  or c
+  jr nz,getsizetokstr_loop
+  ld b,d
+  ld c,e
+  ret
+
+;Sample get_tok_size for TI tokens
+; get_tok_size:
+;   ld a,(hl)
+;   inc hl
+;   bcall(_Is2ByteTok)
+;   ld bc,1
+;   ret nz
+;   inc c
+;   inc hl
+;   ret

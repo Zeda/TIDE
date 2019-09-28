@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cd src
+echo -e "\e[1m\e[37mAssembling App\e[0m"
+spasm TIDE.z80 ../bin/TIDE.8xk -I ../../Z80-Optimized-Routines

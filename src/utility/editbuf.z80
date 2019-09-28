@@ -1,0 +1,50 @@
+close_editbuf:
+  ld hl,(edit_end)
+  ld de,(edit_bottom)
+  or a
+  sbc hl,de
+  ex de,hl
+  dec hl
+  ld (hl),d
+  dec hl
+  ld (hl),e
+  ld hl,(edit_top)
+  ld de,(edit_end)
+  sbc hl,de
+  ;delete HL bytes at DE
+  ex de,hl
+  bcall(_DelMem)
+  ret
+
+open_editbuf:
+;HL points to the start of the file in RAM
+;BC is the size
+;this routine resizes it to use the remaining RAM
+  push hl
+  push bc
+  ld (edit_bottom),hl
+  ld (edit_ptr),hl
+  add hl,bc
+  ld (edit_end),hl
+  push hl
+  bcall(_MemChk)
+  pop de
+;HL # bytes
+;DE addr
+  push hl
+  bcall(_InsertMem)
+  ex de,hl
+
+;now we need to write edit_top
+  pop de    ;bytes
+  add hl,de
+  ld (edit_top),hl
+  pop hl    ;old size
+  add hl,de
+  ex de,hl
+  pop hl
+  dec hl
+  ld (hl),d
+  dec hl
+  ld (hl),e
+  ret

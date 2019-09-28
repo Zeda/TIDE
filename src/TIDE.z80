@@ -1,0 +1,57 @@
+#include "tide.inc"
+.org $4000
+.db $80,$0F, 0,0,0,0
+.db $80,$12, $01,$04    ;signing key ID
+.db $80,$44, "TIDE"     ;change the $44 for name length (ex. $46 means 6 chars).
+.db $80,$81, 1          ;num pages
+.db $80,$90             ;no splash
+.db $03,$22,$09,$00     ;date stamp
+.db $02,$00             ;date stamp signature
+.db $80,$70             ;final field
+;401Dh
+  call main
+  bcall(_JForceCmdNoChar)
+;0x4023
+main:
+  ld hl,name_test
+  rst rMov9ToOP1
+  bcall(_ChkFindSym)
+  ret c
+  ld a,b
+  or a
+  ret nz
+  ex de,hl
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  inc hl
+  call open_editbuf ;setup edit buf and edit pointers
+  call edit
+  call close_editbuf ;dealloc edit buf
+  ret
+
+clrgbuf:
+  ld hl,gbuf
+  ld de,gbuf+1
+  ld (hl),0
+  ld bc,767
+  ldir
+  ret
+
+name_test:
+  .db 5,"TEST",0
+
+
+#include "gfx/font.z80"
+#include "gfx/text.z80"
+edit_stuff:
+#include "edit.z80"
+#include "utility/editbuf.z80"
+#include "utility/insertdelmem.z80"
+#include "utility/getsizetokstr.z80"
+#include "utility/getKeyTok.z80"
+#include "utility/getKeyChar.z80"
+#include "ti8x/utility/getKey.z80"
+#include "ti8x/utility/getKeyDebounce.z80"
+.echo "Edit Stuff: ",$-edit_stuff," bytes"
+.echo "App: ",$-$4000," bytes"
