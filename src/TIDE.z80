@@ -44,14 +44,17 @@ name_test:
 
 #include "gfx/font.z80"
 #include "gfx/text.z80"
-edit_stuff:
 #include "edit.z80"
 #include "utility/editbuf.z80"
 #include "utility/insertdelmem.z80"
 #include "utility/getsizetokstr.z80"
 #include "utility/getKeyTok.z80"
 #include "utility/getKeyChar.z80"
+#include "ti8x/gfx/UpdateLCD.z80"
+#include "ti8x/gfx/rect.z80"
+rect_XOR:
+  ld hl,gbuf
+#include "ti8x/gfx/rectXOR.z80"
 #include "ti8x/utility/getKey.z80"
 #include "ti8x/utility/getKeyDebounce.z80"
-.echo "Edit Stuff: ",$-edit_stuff," bytes"
 .echo "App: ",$-$4000," bytes"
