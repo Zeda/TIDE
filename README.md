@@ -1,6 +1,12 @@
 # TIDE
 This is the start of an IDE for the monochrome TI-83+/84+ series of calculators.
 
+Here is a current example, in which we see the cursor doesn't blink correctly
+(a copy of the current char isn't being properly saved), but it does properly
+edit `prgmTEST`!
+
+*![Image Description: The current working example of TIDE](img/000.gif)*
+
 # To Build
 I use [spasm-ng](https://github.com/alberthdev/spasm-ng) to compile this
 project. For other compilers, you may need some tweaking and you'll probably
