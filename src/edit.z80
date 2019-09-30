@@ -4,14 +4,31 @@ edit:
 ;   key_to_tok
 ;   edit_hook
 ;   get_tok_size
+  call getKeyDebounce
   ld a,1<<insertmode
   ld (flags+keyflags),a
 rerender_edit:
   call rerender_editor
 edit_loop:
+;Check if [ON] is being pressed
   in a,(4)
   and 8
   ret z
+
+;blink the cursor
+  ld hl,curcount
+  dec (hl)
+  jr nz,+_
+  ld (hl),CUR_COUNT_RESET
+  ld a,(flags+keyflags)
+  xor 1<<cursorblink
+  ld (flags+keyflags),a
+  and 1<<cursorblink
+  call curblink
+  call UpdateLCD
+_:
+
+
   call getKeyDebounce
   or a
   jr z,edit_loop
@@ -23,7 +40,32 @@ edit_loop:
   call edit_hook      ;input and output: HL cur tok, DE new size-prefixed tokstr
   call replacetokens
   ret c               ;there was an error
-  jr nc,rerender_edit
+  jr rerender_edit
+
+curblink:
+;z set if blinking off
+;nz if blinking on
+  ld a,(char_save)
+  jr nz,curblinkon
+;need to redraw the char
+  ld hl,(textrow)
+  ld (texttemp),hl
+  call VPutC
+  ld hl,(texttemp)
+  ld (textrow),hl
+  ret
+
+curblinkon:
+  call chardim    ;returns D is width, E is height
+  ld bc,(textrow)
+  bit insertmode,(iy+keyflags)
+  jr z,+_
+  ld d,1
+_:
+  jp rect_XOR
+
+chardim:
+  ld de,$0406
   ret
 
 replacetokens:
@@ -69,6 +111,62 @@ replacetokens:
   ret
 
 rerender_editor:
+  call clrgbuf
+  ld hl,0
+  ld (textrow),hl
+  ld hl,(edit_bottom)
+  call VPutTokStr
+  di
+  jp UpdateLCD
+VPutTokStr:
+  ld de,(edit_end)
+  ld bc,0
+  or a
+  sbc hl,de
+  add hl,de
+  ret nc
+
+  call get_tok_str
+  ret z
+  push hl
+  ex de,hl
+  call VPutS
+  pop hl
+  ld a,(textrow)
+  cp 64
+  jr c,VPutTokStr
+  ret
+
+get_tok_str:
+;return HL points to the next token
+;       DE points to the token string
+;       z flag set if end-of-string token
+  ld a,(hl)
+  or a
+  ret z
+  cp $3F
+  jr z,+_
+  bcall(_IsA2ByteTok)
+  push af
+  push hl
+  bcall(_Get_Tok_Strng)
+  ld de,OP3
+  pop hl
+  pop af
+  inc hl
+  ret nz
+  inc hl
+  or 1
+  ret
+_:
+  sub $3E   ;char 0x01 is used as a control char to jump down a line
+  inc hl
+  ld de,+_
+  ret
+_:
+  .db 1,0
+
+
 edit_hook:
   ret
 

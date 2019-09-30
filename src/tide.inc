@@ -65,6 +65,7 @@ OPS             = 9828h
 ;TIDE specific equates
 #define K_DELAY_DEFAULT 13
 #define K_DELAY_ACCEL 3
+#define CUR_COUNT_RESET 23
 textrow         = $8000
 textcol         = $8001
 edit_end        = $8002
@@ -74,6 +75,10 @@ buf_top         = edit_top
 edit_bottom     = $8006
 edit_ptr        = $8008
 k_save          = $800A   ;3 bytes
+curcount        = $800D   ;1 byte
+texttemp        = $800E
+char_save       = $8010
+
 
 keyflags        = 21h
 shift           = 0
