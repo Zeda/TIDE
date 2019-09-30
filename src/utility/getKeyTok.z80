@@ -18,6 +18,19 @@ getKeyTok:
     ret
 _:
 
+;Check [Del]
+    cp 56 \ jr nz,+_
+    bit shift,(iy+keyflags)
+    call z,delcurtok
+    scf
+    ret z
+    ld a,(flags+keyflags)
+    xor (1<<shift)+(1<<insertmode)
+    ld (flags+keyflags),a
+    scf
+    ret
+
+_:
 ;Check [Alpha]
     cp 48 \ jp z,mod_alpha
 

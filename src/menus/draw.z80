@@ -1,0 +1,103 @@
+menu_draw_header:
+  .db 3
+  .db "Draw>",0
+  .db "<Points>",0
+  .db "<Sto",0
+menu_draw:
+  jr c,menu_draw_select
+menu_draw_get:
+;A is the header
+;HL is the index
+  dec b
+  inc b
+  scf
+  ret nz
+
+  ld hl,menu_draw_1
+  dec a
+  jr z,+_
+  ld hl,menu_draw_2
+  dec a
+  jr z,+_
+  ld hl,menu_draw_0
+_:
+  ld a,c
+  cp (hl)
+  ccf
+  ret c
+  inc hl
+  add hl,bc
+  add hl,bc
+  ld de,OP1
+  ldi
+  ldi
+  ld hl,OP1
+  call get_tok_str
+  ex de,hl
+  or a
+  ret
+
+menu_draw_select:
+  dec b
+  inc b
+  jp nz,menu_get_select_err
+
+  ld hl,menu_draw_1
+  dec a
+  jr z,+_
+  ld hl,menu_draw_2
+  dec a
+  jr z,+_
+  ld hl,menu_draw_0
+_:
+  ld a,c
+  cp (hl)
+  jp nc,menu_get_select_err
+  inc bc
+  add hl,bc
+  add hl,bc
+
+;HL points to the second byte of the token
+  xor a
+  ld de,OP1+5
+  ld (de),a
+  dec de
+  cp (hl)
+  ldd
+  ldd
+  ld bc,1
+  ld (de),a
+  dec de
+  adc a,c
+  ld (de),a
+  ex de,hl
+  scf
+  ret
+
+menu_draw_0:
+  .db 10
+  .db $85,$00
+  .db $9C,$00
+  .db $A6,$00
+  .db $9D,$00
+  .db $A7,$00
+  .db $A9,$00
+  .db $A4,$00
+  .db $A8,$00
+  .db $A5,$00
+  .db $93,$00
+menu_draw_1:
+  .db 7
+  .db $9E,$00
+  .db $9F,$00
+  .db $A0,$00
+  .db $A1,$00
+  .db $A2,$00
+  .db $A3,$00
+  .db $13,$00
+menu_draw_2:
+  .db 4
+  .db $98,$00
+  .db $99,$00
+  .db $9A,$00
+  .db $9B,$00

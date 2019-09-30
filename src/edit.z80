@@ -8,8 +8,10 @@ edit:
   ld a,1<<insertmode
   ld (flags+keyflags),a
 rerender_edit:
-  call rerender_editor
+  set rerender,(iy+editorflags)
 edit_loop:
+  call rerender_editor
+
 ;Check if [ON] is being pressed
   in a,(4)
   and 8
@@ -62,7 +64,7 @@ curblinkon:
   jr z,+_
   ld d,1
 _:
-  jp rect_XOR
+  jp xorRect
 
 chardim:
   ld de,$0406
@@ -111,6 +113,10 @@ replacetokens:
   ret
 
 rerender_editor:
+  bit rerender,(iy+editorflags)
+  ret z
+  res rerender,(iy+editorflags)
+
   call clrgbuf
   ld hl,0
   ld (textrow),hl
@@ -146,6 +152,8 @@ get_tok_str:
   ret z
   cp $3F
   jr z,+_
+  call isAxeTok
+  jr z,get_tok_str_no_EOS
   bcall(_IsA2ByteTok)
   push af
   push hl
@@ -156,6 +164,7 @@ get_tok_str:
   inc hl
   ret nz
   inc hl
+get_tok_str_no_EOS:
   or 1
   ret
 _:
@@ -166,8 +175,88 @@ _:
 _:
   .db 1,0
 
+isAxeTok:
+  cp 'W'
+  jr z,checkWhite
+  cp 'I'
+  jr z,checkInvert
+isRectTok:
+  cp $BB
+  ret nz
+  inc hl
+  ld a,(hl)
+  cp $2D    ;ref(
+  jr nz,isAxeTok_decExit
+  inc hl
+  ld de,s_Rect
+  ret
+isAxeTok_decExit:
+  dec hl
+  ret
+
+checkWhite:
+  inc hl
+  ld a,(hl)
+  cp $9C
+  jr nz,+_
+  inc hl
+  ld de,s_WhiteLine
+  ret
+_:
+  call isRectTok
+  jr nz,isAxeTok_decExit
+  ld de,s_WhiteRect
+  ret
+
+checkInvert:
+  inc hl
+  ld a,(hl)
+  cp $9C
+  jr nz,+_
+  inc hl
+  ld de,s_InvertLine
+  ret
+_:
+  call isRectTok
+  jr nz,isAxeTok_decExit
+  ld de,s_InvertRect
+  ret
+
+s_InvertRect:
+  .db 3 \ .dw s_Invert
+  .db 3 \ .dw s_Rect
+  .db 0
+s_WhiteRect:
+  .db 3 \ .dw s_White
+s_Rect:
+  .db "Rect(",0
+
+s_InvertLine:
+  .db 3 \ .dw s_Invert
+  .db 3 \ .dw s_Line
+  .db 0
+s_WhiteLine:
+  .db 3 \ .dw s_White
+s_Line:
+  .db "Line(",0
+
+s_White:
+  .db "White",0
+s_Invert:
+  .db "Invert",0
+
 
 edit_hook:
+  ret
+
+delcurtok:
+  push af
+  set rerender,(iy+editorflags)
+  ld hl,(edit_ptr)
+  call get_tok_size
+  ld hl,(edit_ptr)
+  call delmem
+  pop af
   ret
 
 get_tok_size:
@@ -188,10 +277,31 @@ _IsA2ByteTok  = 42A3h
   ld a,(hl)
   inc hl
   inc c
+  cp 'W'
+  jr nc,+_
+
   bcall(_IsA2ByteTok)
   ret nz
+get_tok_size_inc:
   inc hl
   inc c
+  ret
+get_tok_size_dec:
+  dec hl
+  ret
+_:
+  ld a,(hl)
+  cp $9C      ;Line
+  jr z,get_tok_size_inc
+  cp $BB
+  ret nz
+  inc hl
+  ld a,(hl)
+  cp $2D      ;ref(
+  jr nz,get_tok_size_dec
+  inc c
+  inc c
+  inc hl
   ret
 
 process_keypress:
@@ -199,6 +309,29 @@ key_to_tok:
 ;return carry if no token returned
 ;return HL as a pointer to the null-terminated token string
 ;       BC as the number of tokens to overwrite,
+  cp 31   ;prgm token
+  jr nz,key_to_tok_convert
+  bit shift,(iy+keyflags)
+  res shift,(iy+keyflags)
+  ld ix,menu_prgm
+  ld hl,menu_prgm_header
+  jr z,+_
+  ld hl,menu_draw_header
+  ld ix,menu_draw
+_:
+  ld bc,$1008
+  ld de,$4030
+  call menu
+  set rerender,(iy+editorflags)
+  bit insertmode,(iy+keyflags)
+  jr z,+_
+  ld c,b
+_:
+
+  ccf
+  ret
+
+key_to_tok_convert:
   call getKeyTok
   ret c
 ;else, the key was a token

@@ -45,6 +45,7 @@ name_test:
 #include "gfx/font.z80"
 #include "gfx/text.z80"
 #include "edit.z80"
+#include "utility/pushpop.z80"
 #include "utility/editbuf.z80"
 #include "utility/insertdelmem.z80"
 #include "utility/getsizetokstr.z80"
@@ -52,9 +53,22 @@ name_test:
 #include "utility/getKeyChar.z80"
 #include "ti8x/gfx/UpdateLCD.z80"
 #include "ti8x/gfx/rect.z80"
-rect_XOR:
+
+xorRect:
   ld hl,gbuf
 #include "ti8x/gfx/rectXOR.z80"
+
+orRect:
+  ld hl,gbuf
+#include "ti8x/gfx/rectOR.z80"
+
+eraseRect:
+  ld hl,gbuf
+#include "ti8x/gfx/rectErase.z80"
+
 #include "ti8x/utility/getKey.z80"
 #include "ti8x/utility/getKeyDebounce.z80"
+#include "ti8x/utility/menu.z80"
+#include "menus/draw.z80"
+#include "menus/prgm.z80"
 .echo "App: ",$-$4000," bytes"

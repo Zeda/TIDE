@@ -1,0 +1,15 @@
+menu_prgm_header:
+  .db 3
+  .db "Control>",0
+  .db "<I/O>",0
+  .db "<Exec",0
+menu_prgm:
+  jr c,menu_prgm_select
+menu_prgm_get:
+  scf     ;means out-of-bounds
+  ret
+menu_prgm_select:
+  xor a
+  ld h,a
+  ld l,a
+  ret

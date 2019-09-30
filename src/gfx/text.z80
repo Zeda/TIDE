@@ -4,9 +4,7 @@ VPutS_loc:
 
 _:
   inc hl
-  push hl
   call VPutC
-  pop hl
 VPutS:
 ;Inputs:
 ;   HL points to a zero terminated string to display
@@ -31,14 +29,69 @@ VPutC_newline:
   add a,6
   ld (textrow),a
   ret
+
+VPutC_tab:
+  ld a,(textcol)
+  add a,16
+  and %11110000
+  ld (textcol),a
+  ret
+
+VPutC_str:
+  ld e,(hl)
+  inc hl
+  ld d,(hl)
+  inc hl
+  push hl
+  ex de,hl
+  jr +_
+VPutC_strrel:
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  inc hl
+  push hl
+  add hl,bc
+_:
+  call VPutS
+  pop hl
+  ret
+
+VPutC_token:
+  ret
+
 VPutC:
 ;Inputs:
 ;    A is the char to draw
 ;     (textRow) is the pixel row to draw at
 ;     (textCol) is the text column to draw at (0 to 23)
+
+;Control Characters
+;   0x00
+;   0x01  newline
+;   0x02  tab
+;   0x03  str, followed by 2-byte ptr
+;   0x04  str_rel, followed by 2-byte offset
+;   0x05  token
+
+
+
   dec a
   jr z,VPutC_newline
-  ld hl,font_small+3
+  dec a
+  jr z,VPutC_tab
+  dec a
+  jr z,VPutC_str
+  dec a
+  jr z,VPutC_strrel
+  dec a
+  jr z,VPutC_token
+  push hl
+  call +_
+  pop hl
+  ret
+_:
+  ld hl,font_small+(3*5)
   ld c,a
   ld b,0
   add hl,bc
