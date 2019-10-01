@@ -455,9 +455,12 @@ _:
 get_tok_first_char:
   call get_tok_str
   ld a,(de)
-  cp 6
+  cp 7
   ret nc
   ex de,hl
+  ld a,' '
+  ret z
+  ld a,(hl)
   cp 3
   ld a,' '
   ret c
@@ -478,10 +481,64 @@ _:
   ld a,(hl)
   ret
 
+get_str_width:
+;DE points to the token string
+  ex de,hl
+  ld de,0
+  jr get_str_width_begin
+get_str_width_loop:
+  push de
+  cp 7
+  jr c,+_
+  call chardim
+  pop bc
+  ld a,c
+  add a,d
+  ld e,a
+  ld a,b
+  adc a,0
+  ld d,a
+  jr get_str_width_begin
+_:
+  sub 3
+  jr c,get_str_width_begin-1
+  sub 2
+  jr c,+_
+  call get_tok_str
+  jr get_str_width_substr
+_:
+  ld e,(hl)
+  inc hl
+  ld d,(hl)
+  inc hl
+  rrca
+  jr c,get_str_width_substr
+  ex de,hl
+  add hl,de
+  ex de,hl
+get_str_width_substr:
+  push hl
+  call get_str_width
+  pop de
+  pop hl
+  add hl,bc
+  ex de,hl
+  .db $FE
+  pop de
+get_str_width_begin:
+  ld a,(hl)
+  inc hl
+  or a
+  jr nz,get_str_width_loop
+  ld b,d
+  ld c,e
+  ret
+
 process_keypress:
   cp 5
-  jr nc,key_to_tok
+  jp nc,key_to_tok
   ld bc,(cursorrow)
+  ld hl,(edit_ptr)
   dec a
   jr nz,+_
   ;down
@@ -491,11 +548,35 @@ process_keypress:
   jr find_token_by_coord
 _:
   dec a
-  jr nz,+_
+  jr nz,editor_checkdown
   ;left
-  dec c
-  jr find_token_by_coord
+  call locate_previous_token
+  ld (edit_ptr),hl
+  ;make sure it isn't a newline
+  call get_tok_str
+  ld a,(cursorcol)
+  cp 96
+  jr c,+_
+arrow_key_rerender:
+  set rerender,(iy+editorflags)
+arrow_key_rerender_reload_char:
+  ld hl,(edit_ptr)
+  call get_tok_first_char
+  ld (char_save),a
+  scf
+  ret
 _:
+  call get_str_width
+  inc b
+  dec b
+  jr nz,arrow_key_rerender
+  ld a,(cursorcol)
+  sub c
+  jr c,arrow_key_rerender
+  ld (cursorcol),a
+  jr arrow_key_rerender_reload_char
+  ret
+editor_checkdown:
   dec a
   jr z,+_
   ;up. note I used `jr z,` instead of `jr nz,`
@@ -506,7 +587,6 @@ _:
 _:
   ;right. This is the only easy one in the existing system.
   ;We'll just redraw the token, but keep the updated textcoord
-  ld hl,(edit_ptr)
   call get_tok_str
   ret z
   call get_tok_first_char
@@ -525,7 +605,59 @@ _:
   scf
   ret
 find_token_by_coord:
+;BC is the coordinate against which to compare
+;if X is negative, need to set X to 95 and subtract 6 from Y
+;if X is >=96, need to scroll the line appropriately
+;     if we scroll in a newline, need to first unscroll the line
+;if the Y coord is -6, need to scroll the contents down 6 and draw the top row
+;of text.
+;if the Y coord is >=64, need to scroll the contents up 6 and draw the bottom
+;row of text.
+
+;check if X is negative
+  ld a,b
+  add a,a
+  jr nc,+_
+  call locate_previous_token
+  ld (edit_ptr),hl
+  set rerender,(iy+editorflags)
+  ;check if the char was a newline. If so, go to the end of the previous line
+  call get_tok_str
+  ;we'll just assume that a newline will be the first char if there is a newline
+  ld a,(de)
+  dec a
+  jr nz,+_
+  call locate_previous_token
+  ld (edit_ptr),hl
+_:
+
   scf
+  ret
+
+locate_previous_token:
+  ;We need to move backward by 1 token
+  ;WARNING: Right now, I'm hardcoding the format for TI-OS tokens
+  ;A token is more than one byte iff it is preceded by specific bytes
+  ;This is NOT the case for general languages, especially those like Grammer :|
+  dec hl
+  dec hl
+  ld a,(hl)
+  bcall(_IsA2ByteTok)
+  jr nz,+_
+  ;this is the start of a 2-byte token, but just make sure it isn't because it
+  ;is a hacked var
+  dec hl
+  ld a,(hl)
+  inc hl
+  cp $BB
+  jr z,+_+1
+  cp $EF
+  jr z,+_+1
+  bcall(_IsA2ByteTok)
+  jr z,+_
+  .db $FE     ;beginning of `cp *`, a cheap way to null the next `inc hl`
+_:
+  inc hl
   ret
 
 key_to_tok:
