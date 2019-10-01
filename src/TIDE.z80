@@ -12,6 +12,7 @@
   call main
   bcall(_JForceCmdNoChar)
 ;0x4023
+#include "jumptable.z80"
 main:
   ld hl,name_test
   rst rMov9ToOP1
@@ -45,9 +46,10 @@ name_test:
 #include "gfx/font.z80"
 #include "gfx/text.z80"
 #include "edit.z80"
-#include "utility/pushpop.z80"
 #include "utility/editbuf.z80"
+#include "search/cpstr.z80"
 #include "utility/insertdelmem.z80"
+#include "utility/pushpop.z80"
 #include "utility/getsizetokstr.z80"
 #include "utility/getKeyTok.z80"
 #include "utility/getKeyChar.z80"
