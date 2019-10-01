@@ -59,6 +59,11 @@ _:
 
 VPutC_token:
   ret
+VPutC_invert:
+  ld a,(flags+editorflags)
+  xor 1<<textinverse
+  ld (flags+editorflags),a
+  ret
 
 VPutC:
 ;Inputs:
@@ -73,6 +78,7 @@ VPutC:
 ;   0x03  str, followed by 2-byte ptr
 ;   0x04  str_rel, followed by 2-byte offset
 ;   0x05  token
+;   0x06  invert
 
 
 
@@ -86,12 +92,14 @@ VPutC:
   jr z,VPutC_strrel
   dec a
   jr z,VPutC_token
+  dec a
+  jr z,VPutC_invert
   push hl
   call +_
   pop hl
   ret
 _:
-  ld hl,font_small+(3*5)
+  ld hl,font_small+(3*6)
   ld c,a
   ld b,0
   add hl,bc
@@ -103,6 +111,8 @@ _:
   ex de,hl
 _:
   ld a,(de)
+  bit textinverse,(iy+editorflags)
+  jr nz,$+3
   cpl
   and c
   ld (hl),a
@@ -111,6 +121,8 @@ _:
   inc l
 
   ld a,(de)
+  bit textinverse,(iy+editorflags)
+  jr nz,$+3
   cpl
   rrca \ rrca
   rrca \ rrca

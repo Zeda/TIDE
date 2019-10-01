@@ -1,8 +1,8 @@
 menu_draw_header:
   .db 3
-  .db "Draw>",0
-  .db "<Points>",0
-  .db "<Sto",0
+  .db 6,"Draw",6," Points Sto",0
+  .db "Draw ",6,"Points",6," Sto",0
+  .db "Draw Points ",6,"Sto",6,0
 menu_draw:
   jr c,menu_draw_select
 menu_draw_get:
