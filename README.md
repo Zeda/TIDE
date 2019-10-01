@@ -1,13 +1,19 @@
 # TIDE
 This is the start of an IDE for the monochrome TI-83+/84+ series of calculators.
 
-Here is a current example, in which we see the cursor doesn't blink correctly
-(a copy of the current char isn't being properly saved), but it does properly
-edit `prgmTEST`! It can even rename groups of tokens in a way not achievable in
-a token hook. For example, `I` is a token, and so is `Line(`, but we can read
-them together as their own token, `InvertLine(`:
+Here is a current example, in which we see that it:
+* loads the file
+* displays it line-by-line
+* can traverse via left and right arrow keys
+* can open a menu with multiple headers and select an entry
+* can edit the file and successfully save
 
-*![Image Description: The current working example of TIDE](img/001.gif)*
+*![Image Description: The current working example of TIDE](img/003.gif)*
+
+What is not shown:
+* dynamic tokenizing-- in the example implementation, if you type `LINE(`, it
+  will convert this to the `Line(` token.
+* dynamic *re*tokenizing-- when the tokens `W` or `I` are followed by  `Line(` they will be displayed as `WhiteLine(` or `InvertLine(`, respectively, and are treated as one, multi-byte token.
 
 # To Build
 I use [spasm-ng](https://github.com/alberthdev/spasm-ng) to compile this
