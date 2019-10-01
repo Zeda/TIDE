@@ -38,6 +38,12 @@ _:
   call getKeyDebounce
   or a
   jr z,edit_loop
+  push af
+  ld a,(char_save)
+  call curblinkoff
+  ld a,1
+  ld (curcount),a
+  pop af
   call process_keypress
   jr c,edit_loop
 ;HL is a pointer to a size-prefixed tok string
@@ -53,6 +59,7 @@ curblink:
 ;nz if blinking on
   ld a,(char_save)
   jr nz,curblinkon
+curblinkoff:
 ;need to redraw the char
   ld hl,(textrow)
   push hl
@@ -141,31 +148,7 @@ rerender_editor:
   sbc hl,de
   add hl,de
   ld a,' '
-  jr nc,+_
-get_tok_first_char:
-  call get_tok_str
-  ld a,(de)
-  cp 6
-  jr nc,+_
-  ex de,hl
-  cp 3
-  ld a,' '
-  jr c,+_
-  ld a,(hl)
-  cp 5
-  inc hl
-  jr z,get_tok_first_char
-  ld e,(hl)
-  inc hl
-  ld d,(hl)
-  cp 4
-  jr nz,$+5
-  inc hl
-  add hl,de
-  .db $FE
-  ex de,hl
-  ld a,(hl)
-_:
+  call c,get_tok_first_char
   ld (char_save),a
 
 ;Update the LCD
@@ -266,6 +249,7 @@ get_tok_str:
   jr z,+_
   call isAxeTok
   jr z,get_tok_str_no_EOS
+  ld a,(hl)
   bcall(_IsA2ByteTok)
   push af
   push hl
@@ -468,7 +452,82 @@ _:
   inc hl
   ret
 
+get_tok_first_char:
+  call get_tok_str
+  ld a,(de)
+  cp 6
+  ret nc
+  ex de,hl
+  cp 3
+  ld a,' '
+  ret c
+  ld a,(hl)
+  cp 5
+  inc hl
+  jr z,get_tok_first_char
+  ld e,(hl)
+  inc hl
+  ld d,(hl)
+  cp 4
+  jr nz,+_
+  inc hl
+  add hl,de
+  .db $FE   ;start of `cp *`, where the `ex de,hl` is used as data
+_:
+  ex de,hl
+  ld a,(hl)
+  ret
+
 process_keypress:
+  cp 5
+  jr nc,key_to_tok
+  ld bc,(cursorrow)
+  dec a
+  jr nz,+_
+  ;down
+  ld a,b
+  add a,TEXT_HEIGHT
+  ld b,a
+  jr find_token_by_coord
+_:
+  dec a
+  jr nz,+_
+  ;left
+  dec c
+  jr find_token_by_coord
+_:
+  dec a
+  jr z,+_
+  ;up. note I used `jr z,` instead of `jr nz,`
+  ld a,b
+  sub TEXT_HEIGHT
+  ld b,a
+  jr find_token_by_coord
+_:
+  ;right. This is the only easy one in the existing system.
+  ;We'll just redraw the token, but keep the updated textcoord
+  ld hl,(edit_ptr)
+  call get_tok_str
+  ret z
+  call get_tok_first_char
+  ld (char_save),a
+
+  ld hl,(edit_ptr)
+  call get_tok_str
+  ld (edit_ptr),hl
+
+  ld hl,(cursorrow)
+  ld (textrow),hl
+  ex de,hl
+  call VPutS
+  ld hl,(textrow)
+  ld (cursorrow),hl
+  scf
+  ret
+find_token_by_coord:
+  scf
+  ret
+
 key_to_tok:
 ;return carry if no token returned
 ;return HL as a pointer to the null-terminated token string
