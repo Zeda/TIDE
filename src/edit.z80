@@ -4,13 +4,17 @@ edit:
 ;   key_to_tok
 ;   edit_hook
 ;   get_tok_size
-  call getKeyDebounce
+
+;Set up the keyflags
   ld a,1<<insertmode
   ld (flags+keyflags),a
+
 rerender_edit:
+  call getKeyDebounce
   set rerender,(iy+editorflags)
 edit_loop:
-  call rerender_editor
+  bit rerender,(iy+editorflags)
+  call nz,rerender_editor
 
 ;Check if [ON] is being pressed
   in a,(4)
@@ -51,15 +55,17 @@ curblink:
   jr nz,curblinkon
 ;need to redraw the char
   ld hl,(textrow)
-  ld (texttemp),hl
+  push hl
+  ld hl,(cursorrow)
+  ld (textrow),hl
   call VPutC
-  ld hl,(texttemp)
+  pop hl
   ld (textrow),hl
   ret
 
 curblinkon:
   call chardim    ;returns D is width, E is height
-  ld bc,(textrow)
+  ld bc,(cursorrow)
   bit insertmode,(iy+keyflags)
   jr z,+_
   ld d,1
@@ -113,25 +119,131 @@ replacetokens:
   ret
 
 rerender_editor:
-  bit rerender,(iy+editorflags)
-  ret z
+;reset the rerender flag
   res rerender,(iy+editorflags)
 
+;clear the graphics buffer
   call clrgbuf
+
+;reset the text coordinates
   ld hl,0
   ld (textrow),hl
+
+;draw the file, but look for the cursor location!
   ld hl,(edit_bottom)
-  call VPutTokStr
+  ld bc,(edit_ptr)
+  call VPutTokStr_findcursor
+
+;Get a copy of the char that the cursor is over
+  ld hl,(edit_ptr)
+  ld de,(edit_end)
+  or a
+  sbc hl,de
+  add hl,de
+  ld a,' '
+  jr nc,+_
+get_tok_first_char:
+  call get_tok_str
+  ld a,(de)
+  cp 6
+  jr nc,+_
+  ex de,hl
+  cp 3
+  ld a,' '
+  jr c,+_
+  ld a,(hl)
+  cp 5
+  inc hl
+  jr z,get_tok_first_char
+  ld e,(hl)
+  inc hl
+  ld d,(hl)
+  cp 4
+  jr nz,$+5
+  inc hl
+  add hl,de
+  .db $FE
+  ex de,hl
+  ld a,(hl)
+_:
+  ld (char_save),a
+
+;Update the LCD
   di
   jp UpdateLCD
-VPutTokStr:
+
+VPutTokStr_findcursor:
+;BC is the byte the cursor is at
+  ld de,-1
+  ld (cursorrow),de
+  call VPutTokStr_findcursor_loop
+
+;make sure cursorrow is not still (-1,-1)
+  ld hl,(cursorrow)
+  ld a,h
+  and l
+  inc a
+  ret nz
+
+;cursorrow is still (-1,-1), so the cursor was never found
+;this should mean a bad bug is here, but let's just set the cursor to the end of
+;the file
+  ld hl,(edit_end)
+  ld (edit_ptr),hl
+  ld hl,(textrow)
+  ld (cursorrow),hl
+  ret
+
+VPutTokStr_findcursor_loop:
+;Make sure that we aren't at the end of the file data
   ld de,(edit_end)
-  ld bc,0
   or a
   sbc hl,de
   add hl,de
   ret nc
 
+;Check if HL is at BC yet
+  xor a
+  sbc hl,bc
+  add hl,bc
+  jr c,+_
+  ;this means HL is at or past BC
+  ;If we are now past BC, we need to verify that we aren't partway through a
+  ;token (in case of retokenizing), and continue on with the faster version of
+  ;tis routine.
+  ld de,(textrow)
+  ld (cursorrow),de
+  jr z,VPutTokStr_cursor_found
+  ;so we are split through a token. That's okay, we'll just load HL as the new
+  ;edit_ptr :)
+  ld (edit_ptr),hl
+  jr VPutTokStr_cursor_found
+
+_:
+
+  push bc
+  call get_tok_str
+  pop bc
+  ret z
+  push bc
+  push hl
+  ex de,hl
+  call VPutS
+  pop hl
+  pop bc
+  ld a,(textrow)
+  cp 64
+  jr c,VPutTokStr_findcursor_loop
+  ret
+
+VPutTokStr:
+  ld de,(edit_end)
+  or a
+  sbc hl,de
+  add hl,de
+  ret nc
+
+VPutTokStr_cursor_found:
   call get_tok_str
   ret z
   push hl
@@ -247,7 +359,57 @@ s_Invert:
 
 
 edit_hook:
+;If the token being typed is a '(', then check if we want to retroactively write
+;a function token
+  ;note that DE points to the string in question
+  push hl
+  push de
+  push bc
+  ld a,(de)
+  dec a
+  jr nz,edit_hook_end
+  inc de
+  ld a,(de)
+  or a
+  jr nz,edit_hook_end
+  inc de
+  ld a,(de)
+  cp $10    ;open parens
+  jr nz,edit_hook_end
+  ;now HL points to the current token, but let's look at the preceding tokens
+  ld bc,-4
+  add hl,bc
+  ld de,str_Line
+  call cpstr
+  or a
+  jr nz,edit_hook_end
+  dec c
+  add hl,bc
+  ;HL points to where to overwrite the tokens
+  pop bc
+
+  pop de
+  pop de
+  ld de,tokstr_Line
+  inc bc
+  inc bc
+  inc bc
+  inc bc
   ret
+
+
+edit_hook_end:
+  pop bc
+  pop de
+  pop hl
+  ret
+
+tokstr_Line:
+  .dw 1
+  .db $9C,0
+str_Line:
+  .db "LINE",0
+
 
 delcurtok:
   push af
@@ -278,6 +440,8 @@ _IsA2ByteTok  = 42A3h
   inc hl
   inc c
   cp 'W'
+  jr nc,+_
+  cp 'I'
   jr nc,+_
 
   bcall(_IsA2ByteTok)

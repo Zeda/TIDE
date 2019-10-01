@@ -82,7 +82,9 @@ k_save          = $800A   ;3 bytes
 curcount        = $800D   ;1 byte
 texttemp        = $800E
 char_save       = $8010
-tide_vars_end   = $8011
+cursorrow       = $8011
+cursorcol       = $8012
+tide_vars_end   = $8013
 
 
 keyflags        = 21h
