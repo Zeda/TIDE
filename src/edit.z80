@@ -417,7 +417,6 @@ get_tok_size:
   ret nc
   ;if HL>=DE, should exit with BC=0
 
-
 ;here is the custom stuff
 _IsA2ByteTok  = 42A3h
   ld a,(hl)
@@ -537,15 +536,22 @@ get_str_width_begin:
 process_keypress:
   cp 5
   jp nc,key_to_tok
-  ld bc,(cursorrow)
   ld hl,(edit_ptr)
   dec a
   jr nz,+_
   ;down
-  ld a,b
+  ld a,(cursorrow)
   add a,TEXT_HEIGHT
-  ld b,a
-  jr find_token_by_coord
+  cp 65-TEXT_HEIGHT
+  ccf
+  ret c
+  ld (cursorrow),a
+  xor a
+  ld (cursorcol),a
+  call seek_next_line
+  inc hl
+  ld (edit_ptr),hl
+  jr get_first_char_at_HL
 _:
   dec a
   jr nz,editor_checkdown
@@ -561,6 +567,7 @@ arrow_key_rerender:
   set rerender,(iy+editorflags)
 arrow_key_rerender_reload_char:
   ld hl,(edit_ptr)
+get_first_char_at_HL:
   call get_tok_first_char
   ld (char_save),a
   scf
@@ -578,13 +585,22 @@ _:
   ret
 editor_checkdown:
   dec a
-  jr z,+_
+  jr z,editor_checkright
   ;up. note I used `jr z,` instead of `jr nz,`
-  ld a,b
-  sub TEXT_HEIGHT
-  ld b,a
-  jr find_token_by_coord
+  ld a,(cursorrow)
+  sub a,TEXT_HEIGHT
+  ret c
+  ld (cursorrow),a
+  xor a
+  ld (cursorcol),a
+  call seek_prev_line
+  call nc,seek_prev_line
+  jr c,+_
+  inc hl
 _:
+  ld (edit_ptr),hl
+  jr get_first_char_at_HL
+editor_checkright:
   ;right. This is the only easy one in the existing system.
   ;We'll just redraw the token, but keep the updated textcoord
   call get_tok_str
@@ -604,41 +620,23 @@ _:
   ld (cursorrow),hl
   scf
   ret
-find_token_by_coord:
-;BC is the coordinate against which to compare
-;if X is negative, need to set X to 95 and subtract 6 from Y
-;if X is >=96, need to scroll the line appropriately
-;     if we scroll in a newline, need to first unscroll the line
-;if the Y coord is -6, need to scroll the contents down 6 and draw the top row
-;of text.
-;if the Y coord is >=64, need to scroll the contents up 6 and draw the bottom
-;row of text.
-
-;check if X is negative
-  ld a,b
-  add a,a
-  jr nc,+_
-  call locate_previous_token
-  ld (edit_ptr),hl
-  set rerender,(iy+editorflags)
-  ;check if the char was a newline. If so, go to the end of the previous line
-  call get_tok_str
-  ;we'll just assume that a newline will be the first char if there is a newline
-  ld a,(de)
-  dec a
-  jr nz,+_
-  call locate_previous_token
-  ld (edit_ptr),hl
-_:
-
-  scf
-  ret
 
 locate_previous_token:
   ;We need to move backward by 1 token
   ;WARNING: Right now, I'm hardcoding the format for TI-OS tokens
   ;A token is more than one byte iff it is preceded by specific bytes
   ;This is NOT the case for general languages, especially those like Grammer :|
+
+; Verify that we aren't at the start of the file
+  ex de,hl
+  ld hl,(edit_bottom)
+  or a
+  sbc hl,de
+  add hl,de
+  ccf
+  ret c
+  ex de,hl
+
   dec hl
   dec hl
   ld a,(hl)
@@ -658,7 +656,25 @@ locate_previous_token:
   .db $FE     ;beginning of `cp *`, a cheap way to null the next `inc hl`
 _:
   inc hl
+  or a
   ret
+
+seek_prev_line:
+  call locate_previous_token
+  ret c
+  ld a,(hl)
+  cp $3F
+  jr nz,seek_prev_line
+  ret
+
+_:
+  call get_tok_size
+seek_next_line:
+  ld a,(hl)
+  cp $3F
+  jr nz,-_
+  ret
+
 
 key_to_tok:
 ;return carry if no token returned
@@ -726,8 +742,14 @@ _:
 _:
 
 ;If insert mode, we'll actually replace 0 bytes
+;If in overwrite mode, we'll actually insert if the next line is a newline
+
   bit insertmode,(iy+keyflags)
-  jr z,+_
+  jr nz,key_to_tok_replace0
+  ld de,(edit_ptr)
+  ld a,(de)
+  cp $3F
+  jr nz,+_
 key_to_tok_replace0:
   ld c,b
 _:
