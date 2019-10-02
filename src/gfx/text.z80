@@ -170,7 +170,21 @@ putsprite_masked:
 ;
 ;This routine is free to use :)
 ;63 bytes (or 64 bytes if gbuf is not located at 0x**40
+  ld a,l
+  add a,b
+  jr nc,+_
+  inc ix \ inc ix \ inc l \ jr nz,$-5
+  ld b,a
+_;
+  sub 64
+  jr c,+_
+  ld a,64
+  sub l
+  ld b,a
+_:
 
+
+  ld a,h
   ld e,l
   ld h,0
   ld d,h
