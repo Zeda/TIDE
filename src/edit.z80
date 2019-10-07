@@ -9,6 +9,9 @@ edit:
   ld a,1<<insertmode
   ld (flags+keyflags),a
 
+  ld hl,0
+  ld (row_left),hl
+
 rerender_edit:
   call getKeyDebounce
   set rerender,(iy+editorflags)
@@ -41,6 +44,7 @@ _:
   push af
   ld a,(char_save)
   call curblinkoff
+  res cursorblink,(iy+keyflags)
   ld a,1
   ld (curcount),a
   pop af
@@ -482,6 +486,7 @@ _:
 
 get_str_width:
 ;DE points to the token string
+;BC is returned as the width
   ex de,hl
   ld de,0
   jr get_str_width_begin
@@ -574,15 +579,42 @@ get_first_char_at_HL:
   ret
 _:
   call get_str_width
+
+  ld hl,(row_left)
   inc b
   dec b
-  jr nz,arrow_key_rerender
+  jr nz,row_left_overflow
   ld a,(cursorcol)
   sub c
-  jr c,arrow_key_rerender
+  jr c,row_left_overflow_low
   ld (cursorcol),a
   jr arrow_key_rerender_reload_char
-  ret
+row_left_overflow:
+;need to do subtract B from H
+  ld a,h
+  sub b
+  ld h,a
+  jr c,row_left_tooleft
+  ld a,(cursorcol)
+  sub c
+row_left_overflow_low:
+;add A-256 to HL
+  add a,l
+  ld l,a
+  jr c,+_
+  dec h
+  jp m,row_left_tooleft
+_:
+  xor a
+  jr +_
+row_left_tooleft:
+  ld hl,-1
+  ld a,TEXTBOX_WIDTH
+_:
+  ld (cursorcol),a
+  ld (row_left),hl
+  jr arrow_key_rerender
+
 editor_checkdown:
   dec a
   jr z,editor_checkright
@@ -608,16 +640,36 @@ editor_checkright:
   call get_tok_first_char
   ld (char_save),a
 
+
+;Update the editptr, but get the token's string in HL
   ld hl,(edit_ptr)
   call get_tok_str
   ld (edit_ptr),hl
 
+
+;We want it to scroll row_left and the text on that row if needed
+  set scrollrow,(iy+editorflags)
+
+;set the textrow/col to the cursorrow/col values
   ld hl,(cursorrow)
   ld (textrow),hl
+
+;Restore the pointer to the token string and draw it
   ex de,hl
   call VPutS
+
+;Disable row scrolling
+  res scrollrow,(iy+editorflags)
+
+;now update the cursorrow/col to the textrow/col values
   ld hl,(textrow)
   ld (cursorrow),hl
+
+;save row_left as the new row_left_save
+  ld hl,(row_left)
+  ld (row_left_save),hl
+
+;returnwith carry flag set to indicate the keypress was taken care of :)
   scf
   ret
 

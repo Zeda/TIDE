@@ -22,18 +22,48 @@ VPutS:
   ret
 
 VPutC_newline:
+  bit scrollrow,(iy+editorflags)
+  jr z,+_
+  ;can't destroy HL, but A is 0
+  ld (row_left),a
+  ld (row_left+1),a
+_:
   ld (textcol),a
   ld a,(textrow)
   cp 64
   ret nc
   add a,6
   ld (textrow),a
+
   ret
 
 VPutC_tab:
   ld a,(textcol)
   add a,16
   and %11110000
+  bit scrollrow,(iy+editorflags)
+  jr z,+_
+  cp TEXTBOX_WIDTH
+  jr c,+_
+  ;then we need to shift the text row left by A-textcol pixels
+  push hl
+  ld hl,(textrow)
+  sub h
+  push af
+  call shift_text_row_left
+  pop af
+  ;need to add A to row_left
+  ld hl,(row_left)
+  add a,l
+  ld l,a
+  jr nc,$+3
+  inc h
+  ld (row_left),hl
+  pop hl
+
+  ;need to set textcol to TEXTBOX_WIDTH
+  ld a,TEXTBOX_WIDTH
+_:
   ld (textcol),a
   ret
 
@@ -134,8 +164,32 @@ _:
   inc de
   djnz -_
 
+
   ld hl,(textrow)
   ld a,h
+  bit scrollrow,(iy+editorflags)
+  jr z,+_
+  cp TEXTBOX_WIDTH
+  jr c,+_
+  push hl
+  add a,4-TEXTBOX_WIDTH
+  push af
+  call shift_text_row_left
+  pop af
+  ld b,a
+  ;need to add A to row_left
+  ld hl,(row_left)
+  add a,l
+  ld l,a
+  jr nc,$+3
+  inc h
+  ld (row_left),hl
+  pop hl
+  ;need to set A to TEXTBOX_WIDTH
+  ld a,TEXTBOX_WIDTH-4
+  ld h,a
+_:
+
   cp 96
   ret nc
   add a,4

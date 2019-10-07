@@ -70,6 +70,7 @@ OPS             = 9828h
 #define K_DELAY_DEFAULT 13
 #define K_DELAY_ACCEL 3
 #define CUR_COUNT_RESET 23
+#define TEXTBOX_WIDTH 92   ;96-4, since chars are 4 pixel wide. Should be computed instead, especially for variable fonts.
 textrow         = $8000
 textcol         = $8001
 edit_end        = $8002
@@ -84,8 +85,12 @@ texttemp        = $800E
 char_save       = $8010
 cursorrow       = $8011
 cursorcol       = $8012
-tide_vars_end   = $8013
+cursorcol_save  = $8013   ;1 byte
+row_left        = $8014   ;2 bytes
+row_left_save   = $8016   ;2 bytes
 
+
+tide_vars_end   = $8018
 
 keyflags        = 21h
 shift           = 0
@@ -99,6 +104,7 @@ cursorblink     = 7
 editorflags     = 22h
 rerender        = 0
 textinverse     = 1
+scrollrow       = 2
 ;===============================================================================
 
 

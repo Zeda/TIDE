@@ -1,0 +1,58 @@
+shift_text_row_left:
+;A is the number of pixels to shift, L is the top row of pixels to start shifting
+
+;Need to get the numbrer of rows of pixels to shift
+;Save A
+  ld b,a
+
+;Used later
+  ld d,0
+
+;make sure L is in bounds, at least somewhat
+  ld a,l
+  cp 64
+  ld a,TEXT_HEIGHT
+  jr c,+_     ;L is already on [0,63]
+  add a,l
+  ret nc      ;L is between [63,256-TEXT_HEIGHT]
+  ;A is the number of rows to shift, need to set L to 0
+  ret z
+  ld l,d
+_:
+
+;Now we need to calculate (L+B)*12-1+gbuf
+;save A
+  ld c,a
+  add a,l
+  add a,a
+  add a,a
+  ld e,a
+  ld hl,gbuf-1
+  add hl,de
+  add hl,de
+  add hl,de
+
+;HL points to the start of the row to shift
+;C is the number of rows
+;B is the number of times to shift
+_:
+  push hl
+  push bc
+  call shift_rows_left_sub
+  pop bc
+  pop hl
+  djnz -_
+  ret
+
+shift_rows_left_sub:
+;HL points to where to begin shifting
+;C is the number of rows
+  or a
+  ld b,12
+_:
+  rl (hl)
+  dec hl
+  djnz -_
+  dec c
+  jr nz,shift_rows_left_sub
+  ret

@@ -45,6 +45,7 @@ name_test:
 
 #include "gfx/font.z80"
 #include "gfx/text.z80"
+#include "gfx/shift_text_row_left.z80"
 #include "edit.z80"
 #include "utility/editbuf.z80"
 #include "search/cpstr.z80"
